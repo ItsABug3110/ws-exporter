@@ -29,15 +29,7 @@ function parseRow(name: string, value?: string) {
   if (normalizedName === 'account') {
     return { account: value };
   }
-  if (normalizedName === 'to') {
-    return { to: value };
-  }
-  if (normalizedName === 'from') {
-    return { from: value };
-  }
-  if (normalizedName === 'status') {
-    return { status: value };
-  }
+ 
   if (normalizedName === 'date') {
     if (!value) {
       return {};
