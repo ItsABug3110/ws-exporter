@@ -15,6 +15,28 @@ type ParsedTransactions = Array<Record<string, number | string | undefined | nul
 function parseRow(name: string, value?: string) {
   const normalizedName = name.toLowerCase();
   // Assumes 3,000.00 -> 3000.00. Will break for some locales
+
+ 
+
+  const parseFilledQuantity = (
+    value: string | undefined
+): { quantity: number; pricePerUnit: number; assetType: string } | undefined => {
+    if (!value) return undefined;
+
+    // Match patterns for quantity, asset type, and price
+    const match = value.match(/([\d.]+)\s+(\w+)\s+x\s+\$([\d.]+)\s+CAD/);
+    if (!match) return undefined;
+
+    const quantity = parseFloat(match[1]); // Extract the numeric quantity
+    const assetType = match[2]; // Extract the asset type (e.g., "shares", "DOGE")
+    const pricePerUnit = parseFloat(match[3]); // Extract the price per unit
+
+    return { quantity, pricePerUnit, assetType };
+};
+
+
+
+
   const normalizeAmount = (amount: string) => amount.replace('$', '').replace(',', '');
   const parseCurrencyValue = (value: string) => {
     const split = value?.split(' ') ?? [];
@@ -29,8 +51,11 @@ function parseRow(name: string, value?: string) {
   if (normalizedName === 'account') {
     return { account: value };
   }
- 
-  if (normalizedName === 'date') {
+  if (normalizedName === 'to') {
+    return { to: value };
+  }
+  
+  if (normalizedName === 'date'|| normalizedName === 'Submitted') {
     if (!value) {
       return {};
     }
@@ -52,6 +77,28 @@ function parseRow(name: string, value?: string) {
     const parsed = parseCurrencyValue(value);
     return { originalAmount: parsed.amount, originalCurrency: parsed.currency };
   }
+  
+  if (normalizedName === 'filled quantity') {
+    const parsed = parseFilledQuantity(value);
+    if (parsed) {
+        return {
+            Quantity: parsed.quantity,
+            PricePerUnit: parsed.pricePerUnit,
+            AssetType: parsed.assetType,
+        };
+    }
+    return undefined; // Return undefined if parsing fails
+}
+
+  
+if (normalizedName === 'total cost') {
+  if (!value) {
+    return {};
+  }
+  const parsed = parseCurrencyValue(value);
+  return { total: parsed.amount, totalCurrency: parsed.currency };
+}
+
   if (normalizedName === 'exchange rate') {
     if (!value) {
       return {};
@@ -65,6 +112,7 @@ function parseRow(name: string, value?: string) {
     const parsed = parseCurrencyValue(value);
     return { total: parsed.amount, totalCurrency: parsed.currency };
   }
+ 
   if (normalizedName.indexOf('spend rewards') > -1) {
     if (!value) {
       return {};
@@ -122,7 +170,7 @@ function processTransactionDetails(element: Element): ParsedTransactions[number]
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
-
+    console.error(row)
     if (row.children.length !== 2 || !row.children[0].textContent) {
       continue;
     }
@@ -132,14 +180,18 @@ function processTransactionDetails(element: Element): ParsedTransactions[number]
   if (Object.keys(rowData).length === 0) {
     return;
   }
-
+  
   if (!rowData.account && (rowData.to || rowData.from)) {
     rowData = { ...rowData, account: ((rowData.total as number) ?? 0) < 0 ? rowData.from : rowData.to };
+    
+
   }
   const description = getTransactionDescription(element);
   if (description) {
     rowData = { ...rowData, description };
   }
+  
+
   return rowData;
 }
 
@@ -198,3 +250,5 @@ export async function exportTransactions() {
   const csv = parsedTransactionsToCsv(result);
   await downloadCsv(`ws-exporter-${new Date().toISOString()}.csv`, csv);
 }
+console.log("Export file compiled and loaded correctly!");
+
